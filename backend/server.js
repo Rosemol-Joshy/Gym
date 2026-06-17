@@ -4,10 +4,12 @@ require("dotenv").config();
 require("./config/db");
 const app = express();
 const trainerRoutes = require("./routes/trainerRoutes");
+const membershipPlanRoutes = require("./routes/membershipPlanRoutes");
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use("/api/trainers", trainerRoutes);
+app.use("/api/membership-plans", membershipPlanRoutes);
 // Test Route
 app.get("/", (req, res) => {
   res.send("Gym Management System Backend is Running 🚀");
