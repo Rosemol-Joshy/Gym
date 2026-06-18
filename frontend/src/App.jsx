@@ -1,13 +1,35 @@
-import { Routes, Route, Link } from "react-router-dom";
+import { Routes, Route, Link, useLocation } from "react-router-dom";
 import Trainer from "./pages/Trainer";
 import Membership from "./pages/Membership";
+import "./App.css";
 
 function App() {
+  const location = useLocation();
+
   return (
-    <div>
-      <nav style={{ padding: "10px", background: "#ddd" }}>
-        <Link to="/">Trainer</Link> |{" "}
-        <Link to="/membership">Membership</Link>
+    <div className="app">
+      <nav className="navbar">
+        <div className="nav-container">
+          <div className="nav-brand"> GymPro</div>
+          <ul className="nav-links">
+            <li>
+              <Link
+                to="/"
+                className={location.pathname === "/" ? "nav-link active" : "nav-link"}
+              >
+              Trainer Management
+              </Link>
+            </li>
+            <li>
+              <Link
+                to="/membership"
+                className={location.pathname === "/membership" ? "nav-link active" : "nav-link"}
+              >
+                Membership Plans
+              </Link>
+            </li>
+          </ul>
+        </div>
       </nav>
 
       <Routes>
