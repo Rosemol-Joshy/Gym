@@ -1,13 +1,25 @@
 import { useState } from "react";
 import "./pages.css";
+import { currentRole } from "../utils/role";
 
 function PaymentManagement() {
+  if (currentRole !== "admin") {
+    return (
+      <div className="page-wrapper">
+        <div className="page-container">
+          <h1>Access Denied</h1>
+        </div>
+      </div>
+    );
+  }
+
   const [payments, setPayments] = useState([]);
 
   const [form, setForm] = useState({
     member_name: "",
     amount: "",
     payment_date: "",
+    due_date: "",
     status: "Pending",
   });
 
@@ -16,6 +28,10 @@ function PaymentManagement() {
       ...form,
       [e.target.name]: e.target.value,
     });
+  };
+
+  const handleDelete = (id) => {
+    setPayments(payments.filter((payment) => payment.payment_id !== id));
   };
 
   const handleSubmit = (e) => {
@@ -33,6 +49,7 @@ function PaymentManagement() {
       member_name: "",
       amount: "",
       payment_date: "",
+      due_date: "",
       status: "Pending",
     });
   };
@@ -84,17 +101,28 @@ function PaymentManagement() {
               </div>
 
               <div>
-                <label className="form-label">Status</label>
-                <select
-                  name="status"
-                  value={form.status}
+                <label className="form-label">Due Date</label>
+                <input
+                  type="date"
+                  name="due_date"
+                  value={form.due_date}
                   onChange={handleChange}
-                >
-                  <option>Paid</option>
-                  <option>Pending</option>
-                  <option>Overdue</option>
-                </select>
+                  required
+                />
               </div>
+            </div>
+
+            <div className="form-group full">
+              <label className="form-label">Status</label>
+              <select
+                name="status"
+                value={form.status}
+                onChange={handleChange}
+              >
+                <option value="Paid">Paid</option>
+                <option value="Pending">Pending</option>
+                <option value="Overdue">Overdue</option>
+              </select>
             </div>
 
             <button className="button-primary" type="submit">
@@ -112,21 +140,52 @@ function PaymentManagement() {
                 <th>ID</th>
                 <th>Member</th>
                 <th>Amount</th>
-                <th>Date</th>
+                <th>Payment Date</th>
+                <th>Due Date</th>
                 <th>Status</th>
+                <th>Actions</th>
               </tr>
             </thead>
 
             <tbody>
-              {payments.map((p) => (
-                <tr key={p.payment_id}>
-                  <td>{p.payment_id}</td>
-                  <td>{p.member_name}</td>
-                  <td>₹{p.amount}</td>
-                  <td>{p.payment_date}</td>
-                  <td>{p.status}</td>
+              {payments.length === 0 ? (
+                <tr>
+                  <td colSpan="7">
+                    <div className="empty-state">
+                      <p className="empty-state-text">
+                        No payment records found.
+                      </p>
+                    </div>
+                  </td>
                 </tr>
-              ))}
+              ) : (
+                payments.map((p) => (
+                  <tr key={p.payment_id}>
+                    <td>#{p.payment_id}</td>
+                    <td>{p.member_name}</td>
+                    <td>₹{p.amount}</td>
+                    <td>{p.payment_date}</td>
+                    <td>{p.due_date}</td>
+
+                    <td>
+                      <span
+                        className={`status-badge status-${p.status.toLowerCase()}`}
+                      >
+                        {p.status}
+                      </span>
+                    </td>
+
+                    <td>
+                      <button
+                        className="button-sm button-sm-danger"
+                        onClick={() => handleDelete(p.payment_id)}
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

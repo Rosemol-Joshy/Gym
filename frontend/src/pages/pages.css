@@ -380,3 +380,31 @@
     padding: 12px 10px;
   }
 }
+.status-paid {
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+}
+
+.status-pending {
+  background: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+}
+
+.status-overdue {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+.status-paid {
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+}
+
+.status-pending {
+  background: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+}
+
+.status-overdue {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}

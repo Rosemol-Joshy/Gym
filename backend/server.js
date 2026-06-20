@@ -1,4 +1,5 @@
 const express = require("express");
+const paymentRoutes = require("./routes/paymentroutes");
 const cors = require("cors");
 require("dotenv").config();
 require("./config/db");
@@ -10,6 +11,7 @@ app.use(cors());
 app.use(express.json());
 app.use("/api/trainers", trainerRoutes);
 app.use("/api/membership-plans", membershipPlanRoutes);
+app.use("/api/payments", paymentRoutes);
 // Test Route
 app.get("/", (req, res) => {
   res.send("Gym Management System Backend is Running 🚀");
