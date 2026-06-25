@@ -270,64 +270,52 @@ function Membership() {
           <div className="table-card-header">
             <h3 className="table-card-title">All Membership Plans</h3>
           </div>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Plan Name</th>
-                <th>Price</th>
-                <th>Duration</th>
-                <th>Description</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {plans.length === 0 ? (
-                <tr>
-                  <td colSpan="7">
-                    <div className="empty-state">
-                      <div className="empty-state-icon"></div>
-                      <p className="empty-state-text">No membership plans yet. Create your first plan to get started!</p>
+          {plans.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-state-icon">📋</div>
+              <p className="empty-state-text">No membership plans yet. Create your first plan to get started!</p>
+            </div>
+          ) : (
+            <div className="cards-grid">
+              {plans.map((p) => (
+                <div className="data-card" key={p.plan_id}>
+                  <div className="data-card-header">
+                    <div>
+                      <span className="data-card-subtitle">#{p.plan_id}</span>
+                      <h4 className="data-card-title">{p.plan_name}</h4>
                     </div>
-                  </td>
-                </tr>
-              ) : (
-                plans.map((p) => (
-                  <tr key={p.plan_id}>
-                    <td>#{p.plan_id}</td>
-                    <td>
-                      <strong>{p.plan_name}</strong>
-                    </td>
-                    <td>₹{p.price.toLocaleString()}</td>
-                    <td>{p.duration_months} Months</td>
-                    <td>{p.description}</td>
-                    <td>
-                      <span className={`status-badge status-${p.status?.toLowerCase() || "inactive"}`}>
-                        {p.status || "N/A"}
+                    <span className={`status-badge status-${p.status?.toLowerCase() || "inactive"}`}>
+                      {p.status || "N/A"}
+                    </span>
+                  </div>
+                  <div className="data-card-body">
+                    <div className="data-card-price">
+                      ₹{p.price.toLocaleString()}
+                      <span style={{ fontSize: "14px", fontWeight: "normal", color: "#A1A1AA" }}>
+                        {" "}
+                        / {p.duration_months} {p.duration_months === 1 ? "Month" : "Months"}
                       </span>
-                    </td>
-                    <td>
-                      <div className="action-buttons">
-                        <button
-                          className="button-sm button-sm-primary"
-                          onClick={() => handleEdit(p)}
-                        >
-                          ✎ Edit
-                        </button>
-                        <button
-                          className="button-sm button-sm-danger"
-                          onClick={() => handleDeletePlan(p.plan_id)}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                    </div>
+                    <p className="data-card-description">{p.description || "No description provided."}</p>
+                  </div>
+                  <div className="data-card-footer">
+                    <button
+                      className="button-sm button-sm-primary"
+                      onClick={() => handleEdit(p)}
+                    >
+                      ✎ Edit
+                    </button>
+                    <button
+                      className="button-sm button-sm-danger"
+                      onClick={() => handleDeletePlan(p.plan_id)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -311,62 +311,66 @@ function Trainer() {
           <div className="table-card-header">
             <h3 className="table-card-title">Trainer Directory</h3>
           </div>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Phone</th>
-                <th>Specialization</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {trainers.length === 0 ? (
-                <tr>
-                  <td colSpan="7">
-                    <div className="empty-state">
-                      <div className="empty-state-icon">👤</div>
-                      <p className="empty-state-text">No trainers found. Add your first trainer to get started!</p>
+          {trainers.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-state-icon">👤</div>
+              <p className="empty-state-text">No trainers found. Add your first trainer to get started!</p>
+            </div>
+          ) : (
+            <div className="cards-grid">
+              {trainers.map((t) => (
+                <div className="data-card" key={t.trainer_id}>
+                  <div className="data-card-header">
+                    <div>
+                      <span className="data-card-subtitle">#{t.trainer_id}</span>
+                      <h4 className="data-card-title">{t.full_name}</h4>
                     </div>
-                  </td>
-                </tr>
-              ) : (
-                trainers.map((t) => (
-                  <tr key={t.trainer_id}>
-                    <td>#{t.trainer_id}</td>
-                    <td>{t.full_name}</td>
-                    <td>{t.email}</td>
-                    <td>{t.phone}</td>
-                    <td>{t.specialization}</td>
-                    <td>
-                      <span className={`status-badge status-${t.status?.toLowerCase() || "inactive"}`}>
-                        {t.status || "N/A"}
+                    <span className={`status-badge status-${t.status?.toLowerCase() || "inactive"}`}>
+                      {t.status || "N/A"}
+                    </span>
+                  </div>
+                  <div className="data-card-body">
+                    <div className="data-card-row">
+                      <span className="data-card-label">Email</span>
+                      <span className="data-card-value">{t.email}</span>
+                    </div>
+                    <div className="data-card-row">
+                      <span className="data-card-label">Phone</span>
+                      <span className="data-card-value">{t.phone || "N/A"}</span>
+                    </div>
+                    <div className="data-card-row">
+                      <span className="data-card-label">Specialization</span>
+                      <span className="data-card-value">{t.specialization || "N/A"}</span>
+                    </div>
+                    <div className="data-card-row">
+                      <span className="data-card-label">Experience</span>
+                      <span className="data-card-value">{t.experience ? `${t.experience} Years` : "N/A"}</span>
+                    </div>
+                    <div className="data-card-row">
+                      <span className="data-card-label">Joining Date</span>
+                      <span className="data-card-value">
+                        {t.joining_date ? new Date(t.joining_date).toLocaleDateString() : "N/A"}
                       </span>
-                    </td>
-                    <td>
-                      <div className="action-buttons">
-                        <button
-                          className="button-sm button-sm-primary"
-                          onClick={() => handleEdit(t)}
-                        >
-                          ✎ Edit
-                        </button>
-                        <button
-                          className="button-sm button-sm-danger"
-                          onClick={() => handleDeleteTrainer(t.trainer_id)}
-                        >
-                           Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                    </div>
+                  </div>
+                  <div className="data-card-footer">
+                    <button
+                      className="button-sm button-sm-primary"
+                      onClick={() => handleEdit(t)}
+                    >
+                      ✎ Edit
+                    </button>
+                    <button
+                      className="button-sm button-sm-danger"
+                      onClick={() => handleDeleteTrainer(t.trainer_id)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

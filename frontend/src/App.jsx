@@ -3,6 +3,8 @@ import PaymentManagement from "./pages/PaymentManagement";
 import AdminDashboard from "./pages/AdminDashboard";
 import TrainerDashboard from "./pages/TrainerDashboard";
 import MemberDashboard from "./pages/MemberDashboard";
+import Trainer from "./pages/Trainer";
+import Membership from "./pages/Membership";
 import { currentRole } from "./utils/role";
 
 import "./App.css";
@@ -26,6 +28,24 @@ function App() {
           className={location.pathname === "/" ? "nav-link active" : "nav-link"}
         >
           Admin Dashboard
+        </Link>
+      </li>
+
+      <li>
+        <Link
+          to="/trainers"
+          className={location.pathname === "/trainers" ? "nav-link active" : "nav-link"}
+        >
+          Trainer Management
+        </Link>
+      </li>
+
+      <li>
+        <Link
+          to="/memberships"
+          className={location.pathname === "/memberships" ? "nav-link active" : "nav-link"}
+        >
+          Membership Plans
         </Link>
       </li>
 
@@ -71,6 +91,8 @@ function App() {
         <Route path="/trainer-dashboard" element={<TrainerDashboard />} />
         <Route path="/member-dashboard" element={<MemberDashboard />} />
         <Route path="/payments" element={<PaymentManagement />} />
+        <Route path="/trainers" element={<Trainer />} />
+        <Route path="/memberships" element={<Membership />} />
       </Routes>
     </div>
   );

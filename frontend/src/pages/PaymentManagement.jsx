@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "./pages.css";
 import { currentRole } from "../utils/role";
+import { getPayments, addPayment, deletePayment } from "../services/paymentService";
 
 function PaymentManagement() {
   if (currentRole !== "admin") {
@@ -23,6 +24,19 @@ function PaymentManagement() {
     status: "Pending",
   });
 
+  const loadPayments = async () => {
+    try {
+      const res = await getPayments();
+      setPayments(Array.isArray(res.data) ? res.data : []);
+    } catch (error) {
+      console.error("Failed to load payments", error);
+    }
+  };
+
+  useEffect(() => {
+    loadPayments();
+  }, []);
+
   const handleChange = (e) => {
     setForm({
       ...form,
@@ -30,28 +44,32 @@ function PaymentManagement() {
     });
   };
 
-  const handleDelete = (id) => {
-    setPayments(payments.filter((payment) => payment.payment_id !== id));
+  const handleDelete = async (id) => {
+    if (window.confirm("Are you sure you want to delete this payment record?")) {
+      try {
+        await deletePayment(id);
+        await loadPayments();
+      } catch (error) {
+        console.error("Failed to delete payment", error);
+      }
+    }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-
-    setPayments([
-      ...payments,
-      {
-        payment_id: payments.length + 1,
-        ...form,
-      },
-    ]);
-
-    setForm({
-      member_name: "",
-      amount: "",
-      payment_date: "",
-      due_date: "",
-      status: "Pending",
-    });
+    try {
+      await addPayment(form);
+      setForm({
+        member_name: "",
+        amount: "",
+        payment_date: "",
+        due_date: "",
+        status: "Pending",
+      });
+      await loadPayments();
+    } catch (error) {
+      console.error("Failed to add payment", error);
+    }
   };
 
   return (
@@ -132,62 +150,56 @@ function PaymentManagement() {
         </div>
 
         <div className="table-card">
-          <h3 className="table-card-title">Payment Records</h3>
+          <div className="table-card-header">
+            <h3 className="table-card-title">Payment Records</h3>
+          </div>
 
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Member</th>
-                <th>Amount</th>
-                <th>Payment Date</th>
-                <th>Due Date</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {payments.length === 0 ? (
-                <tr>
-                  <td colSpan="7">
-                    <div className="empty-state">
-                      <p className="empty-state-text">
-                        No payment records found.
-                      </p>
+          {payments.length === 0 ? (
+            <div className="empty-state">
+              <p className="empty-state-text">No payment records found.</p>
+            </div>
+          ) : (
+            <div className="cards-grid">
+              {payments.map((p) => (
+                <div className="data-card" key={p.payment_id}>
+                  <div className="data-card-header">
+                    <div>
+                      <span className="data-card-subtitle">#{p.payment_id}</span>
+                      <h4 className="data-card-title">{p.member_name}</h4>
                     </div>
-                  </td>
-                </tr>
-              ) : (
-                payments.map((p) => (
-                  <tr key={p.payment_id}>
-                    <td>#{p.payment_id}</td>
-                    <td>{p.member_name}</td>
-                    <td>₹{p.amount}</td>
-                    <td>{p.payment_date}</td>
-                    <td>{p.due_date}</td>
-
-                    <td>
-                      <span
-                        className={`status-badge status-${p.status.toLowerCase()}`}
-                      >
-                        {p.status}
+                    <span className={`status-badge status-${p.status.toLowerCase()}`}>
+                      {p.status}
+                    </span>
+                  </div>
+                  <div className="data-card-body">
+                    <div className="data-card-price" style={{ margin: "5px 0 15px" }}>
+                      ₹{p.amount.toLocaleString()}
+                    </div>
+                    <div className="data-card-row">
+                      <span className="data-card-label">Payment Date</span>
+                      <span className="data-card-value">
+                        {p.payment_date ? new Date(p.payment_date).toLocaleDateString() : "N/A"}
                       </span>
-                    </td>
-
-                    <td>
-                      <button
-                        className="button-sm button-sm-danger"
-                        onClick={() => handleDelete(p.payment_id)}
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                    </div>
+                    <div className="data-card-row">
+                      <span className="data-card-label">Due Date</span>
+                      <span className="data-card-value">
+                        {p.due_date ? new Date(p.due_date).toLocaleDateString() : "N/A"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="data-card-footer">
+                    <button
+                      className="button-sm button-sm-danger"
+                      onClick={() => handleDelete(p.payment_id)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

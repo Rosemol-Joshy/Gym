@@ -86,34 +86,29 @@ function TrainerDashboard() {
             </h3>
           </div>
 
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Member Name</th>
-                <th>Due Date</th>
-                <th>Payment Status</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {members.map((member) => (
-                <tr key={member.id}>
-                  <td>#{member.id}</td>
-                  <td>{member.name}</td>
-                  <td>{member.dueDate}</td>
-
-                  <td>
-                    <span
-                      className={`status-badge status-${member.status.toLowerCase()}`}
-                    >
-                      {member.status}
+          <div className="cards-grid">
+            {members.map((member) => (
+              <div className="data-card" key={member.id}>
+                <div className="data-card-header">
+                  <div>
+                    <span className="data-card-subtitle">#{member.id}</span>
+                    <h4 className="data-card-title">{member.name}</h4>
+                  </div>
+                  <span className={`status-badge status-${member.status.toLowerCase()}`}>
+                    {member.status}
+                  </span>
+                </div>
+                <div className="data-card-body">
+                  <div className="data-card-row">
+                    <span className="data-card-label">Due Date</span>
+                    <span className="data-card-value">
+                      {member.dueDate ? new Date(member.dueDate).toLocaleDateString() : "N/A"}
                     </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

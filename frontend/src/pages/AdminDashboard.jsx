@@ -84,33 +84,27 @@ function AdminDashboard() {
             <h3 className="table-card-title">Recent Payments</h3>
           </div>
 
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Member</th>
-                <th>Amount</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {recentPayments.map((payment) => (
-                <tr key={payment.id}>
-                  <td>#{payment.id}</td>
-                  <td>{payment.member}</td>
-                  <td>₹{payment.amount}</td>
-                  <td>
-                    <span
-                      className={`status-badge status-${payment.status.toLowerCase()}`}
-                    >
-                      {payment.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="cards-grid">
+            {recentPayments.map((payment) => (
+              <div className="data-card" key={payment.id}>
+                <div className="data-card-header">
+                  <div>
+                    <span className="data-card-subtitle">#{payment.id}</span>
+                    <h4 className="data-card-title">{payment.member}</h4>
+                  </div>
+                  <span className={`status-badge status-${payment.status.toLowerCase()}`}>
+                    {payment.status}
+                  </span>
+                </div>
+                <div className="data-card-body">
+                  <div className="data-card-row">
+                    <span className="data-card-label">Amount</span>
+                    <span className="data-card-value">₹{payment.amount.toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

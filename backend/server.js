@@ -1,7 +1,7 @@
+require("dotenv").config();
 const express = require("express");
 const paymentRoutes = require("./routes/paymentroutes");
 const cors = require("cors");
-require("dotenv").config();
 require("./config/db");
 const app = express();
 const trainerRoutes = require("./routes/trainerroutes");
