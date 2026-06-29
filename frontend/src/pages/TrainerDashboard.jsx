@@ -1,5 +1,7 @@
+import { useEffect, useState } from "react";
 import "./pages.css";
 import { currentRole } from "../utils/role";
+import { getPayments } from "../services/paymentService";
 
 function TrainerDashboard() {
   if (currentRole !== "trainer") {
@@ -12,26 +14,34 @@ function TrainerDashboard() {
     );
   }
 
-  const members = [
-    {
-      id: 1,
-      name: "Vishnu",
-      dueDate: "2026-06-20",
-      status: "Pending",
-    },
-    {
-      id: 2,
-      name: "Arjun",
-      dueDate: "2026-06-20",
-      status: "Paid",
-    },
-    {
-      id: 3,
-      name: "Rahul",
-      dueDate: "2026-06-25",
-      status: "Pending",
-    },
-  ];
+  const [payments, setPayments] = useState([]);
+
+  useEffect(() => {
+    loadPayments();
+  }, []);
+
+  const loadPayments = async () => {
+    try {
+      const res = await getPayments();
+      setPayments(res.data);
+    } catch (error) {
+      console.error("Failed to load payments", error);
+    }
+  };
+
+  const totalPayments = payments.length;
+
+  const paidPayments = payments.filter(
+    (p) => p.status === "Paid"
+  ).length;
+
+  const pendingPayments = payments.filter(
+    (p) => p.status === "Pending"
+  ).length;
+
+  const overduePayments = payments.filter(
+    (p) => p.status === "Overdue"
+  ).length;
 
   return (
     <div className="page-wrapper">
@@ -40,41 +50,41 @@ function TrainerDashboard() {
           <div>
             <h1 className="page-title">Trainer Dashboard</h1>
             <p className="page-subtitle">
-              Track member memberships and payment status
+              Monitor member payment records
             </p>
           </div>
         </div>
 
         <div className="content-grid">
           <div className="form-card">
-            <h3>Assigned Members</h3>
-            <h2>12</h2>
+            <h3>💳 Total Payment Records</h3>
+            <h2>{totalPayments}</h2>
             <p className="page-subtitle">
-              Members currently assigned
+              Total payment entries
             </p>
           </div>
 
           <div className="form-card">
-            <h3>Membership Ending Today</h3>
-            <h2>2</h2>
+            <h3>✅ Paid Payments</h3>
+            <h2>{paidPayments}</h2>
             <p className="page-subtitle">
-              Require immediate renewal
+              Successfully completed
             </p>
           </div>
 
           <div className="form-card">
-            <h3>Ending Within 7 Days</h3>
-            <h2>4</h2>
+            <h3>⏳ Pending Payments</h3>
+            <h2>{pendingPayments}</h2>
             <p className="page-subtitle">
-              Follow up with members
+              Awaiting payment
             </p>
           </div>
 
           <div className="form-card">
-            <h3>Pending Payments</h3>
-            <h2>3</h2>
+            <h3>⚠️ Overdue Payments</h3>
+            <h2>{overduePayments}</h2>
             <p className="page-subtitle">
-              Awaiting payment confirmation
+              Require attention
             </p>
           </div>
         </div>
@@ -82,7 +92,7 @@ function TrainerDashboard() {
         <div className="table-card">
           <div className="table-card-header">
             <h3 className="table-card-title">
-              Members Due & Membership Status
+              Recent Payment Records
             </h3>
           </div>
 
@@ -91,27 +101,41 @@ function TrainerDashboard() {
               <tr>
                 <th>ID</th>
                 <th>Member Name</th>
+                <th>Amount</th>
                 <th>Due Date</th>
-                <th>Payment Status</th>
+                <th>Status</th>
               </tr>
             </thead>
 
             <tbody>
-              {members.map((member) => (
-                <tr key={member.id}>
-                  <td>#{member.id}</td>
-                  <td>{member.name}</td>
-                  <td>{member.dueDate}</td>
-
-                  <td>
-                    <span
-                      className={`status-badge status-${member.status.toLowerCase()}`}
-                    >
-                      {member.status}
-                    </span>
+              {payments.length === 0 ? (
+                <tr>
+                  <td colSpan="5">
+                    <div className="empty-state">
+                      <div className="empty-state-icon">💳</div>
+                      <p className="empty-state-text">
+                        No payment records found.
+                      </p>
+                    </div>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                payments.map((payment) => (
+                  <tr key={payment.payment_id}>
+                    <td>#{payment.payment_id}</td>
+                    <td>{payment.member_name}</td>
+                    <td>₹{payment.amount}</td>
+                    <td>{payment.due_date}</td>
+                    <td>
+                      <span
+                        className={`status-badge status-${payment.status.toLowerCase()}`}
+                      >
+                        {payment.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

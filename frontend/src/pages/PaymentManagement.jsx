@@ -4,6 +4,7 @@ import { currentRole } from "../utils/role";
 import {
   getPayments,
   addPayment,
+  updatePayment,
   deletePayment,
 } from "../services/paymentService";
 
@@ -19,7 +20,7 @@ function PaymentManagement() {
   }
 
   const [payments, setPayments] = useState([]);
-
+  const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({
     member_name: "",
     amount: "",
@@ -47,7 +48,17 @@ function PaymentManagement() {
       [e.target.name]: e.target.value,
     });
   };
+  const handleEdit = (payment) => {
+  setEditingId(payment.payment_id);
 
+  setForm({
+    member_name: payment.member_name,
+    amount: payment.amount,
+    payment_date: payment.payment_date,
+    due_date: payment.due_date,
+    status: payment.status,
+  });
+};
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this payment?")) {
       try {
@@ -60,24 +71,30 @@ function PaymentManagement() {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    try {
+  try {
+    if (editingId) {
+      await updatePayment(editingId, form);
+    } else {
       await addPayment(form);
-
-      setForm({
-        member_name: "",
-        amount: "",
-        payment_date: "",
-        due_date: "",
-        status: "Pending",
-      });
-
-      loadPayments();
-    } catch (error) {
-      console.error("Failed to add payment", error);
     }
-  };
+
+    setForm({
+      member_name: "",
+      amount: "",
+      payment_date: "",
+      due_date: "",
+      status: "Pending",
+    });
+
+    setEditingId(null);
+
+    loadPayments();
+  } catch (error) {
+    console.error(error);
+  }
+};
 
   return (
     <div className="page-wrapper">
@@ -157,8 +174,8 @@ function PaymentManagement() {
             </div>
 
             <button className="button-primary" type="submit">
-              Add Payment
-            </button>
+  {editingId ? "Update Payment" : "Add Payment"}
+</button>
           </form>
         </div>
 
@@ -210,13 +227,22 @@ function PaymentManagement() {
                     </td>
 
                     <td>
-                      <button
-                        className="button-sm button-sm-danger"
-                        onClick={() => handleDelete(p.payment_id)}
-                      >
-                        Delete
-                      </button>
-                    </td>
+  <div className="action-buttons">
+    <button
+      className="button-sm button-sm-primary"
+      onClick={() => handleEdit(p)}
+    >
+      Edit
+    </button>
+
+    <button
+      className="button-sm button-sm-danger"
+      onClick={() => handleDelete(p.payment_id)}
+    >
+      Delete
+    </button>
+  </div>
+</td>
                   </tr>
                 ))
               )}
