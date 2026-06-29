@@ -4,6 +4,11 @@ import AdminDashboard from "./pages/AdminDashboard";
 import TrainerDashboard from "./pages/TrainerDashboard";
 import MemberDashboard from "./pages/MemberDashboard";
 import { currentRole } from "./utils/role";
+import AttendancePage        from './pages/attendance/AttendancePage';
+import WorkoutPage           from './pages/workout/WorkoutPage';
+import WorkoutPlanDetailPage from './pages/workout/WorkoutPlanDetailPage';
+import ExercisesPage         from './pages/workout/ExercisesPage';
+import AssignmentsPage       from './pages/workout/AssignmentsPage';
 
 import "./App.css";
 
@@ -71,6 +76,11 @@ function App() {
         <Route path="/trainer-dashboard" element={<TrainerDashboard />} />
         <Route path="/member-dashboard" element={<MemberDashboard />} />
         <Route path="/payments" element={<PaymentManagement />} />
+        <Route path="/attendance" element={<AttendancePage />} />
+        <Route path="/workout" element={<WorkoutPage />} />
+        <Route path="/workout-plans/:id" element={<WorkoutPlanDetailPage />} />
+        <Route path="/exercises" element={<ExercisesPage />} />
+        <Route path="/assignments" element={<AssignmentsPage />} />
       </Routes>
     </div>
   );
