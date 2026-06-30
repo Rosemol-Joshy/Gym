@@ -2,8 +2,9 @@ require("dotenv").config();
 const express = require("express");
 const paymentRoutes = require("./routes/paymentroutes");
 const cors = require("cors");
-require("./config/db");
+const connectDB = require("./config/db");
 const app = express();
+connectDB();
 const trainerRoutes = require("./routes/trainerroutes");
 const membershipPlanRoutes = require("./routes/membershipplanroutes");
 // Middleware

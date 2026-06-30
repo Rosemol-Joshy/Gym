@@ -1,62 +1,90 @@
-const trainerModel = require("../models/trainerModel");
+const Trainer = require("../models/trainerModel");
 
-const addTrainer = (req, res) => {
-  trainerModel.createTrainer(req.body, (err, result) => {
-    if (err) {
-      return res.status(500).json(err);
-    }
+// Add Trainer
+const addTrainer = async (req, res) => {
+  try {
+    const trainer = await Trainer.create(req.body);
 
     res.status(201).json({
       message: "Trainer added successfully",
+      trainer,
     });
-  });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 };
-const getAllTrainers = (req, res) => {
-  trainerModel.getAllTrainers((err, results) => {
-    if (err) {
-      return res.status(500).json(err);
+
+// Get All Trainers
+const getAllTrainers = async (req, res) => {
+  try {
+    const trainers = await Trainer.find().sort({ createdAt: -1 });
+
+    res.status(200).json(trainers);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Get Trainer By ID
+const getTrainerById = async (req, res) => {
+  try {
+    const trainer = await Trainer.findById(req.params.id);
+
+    if (!trainer) {
+      return res.status(404).json({
+        message: "Trainer not found",
+      });
     }
 
-    res.status(200).json(results);
-  });
+    res.status(200).json(trainer);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 };
-const getTrainerById = (req, res) => {
-  const id = req.params.id;
 
-  trainerModel.getTrainerById(id, (err, results) => {
-    if (err) {
-      return res.status(500).json(err);
+// Update Trainer
+const updateTrainer = async (req, res) => {
+  try {
+    const trainer = await Trainer.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
+
+    if (!trainer) {
+      return res.status(404).json({
+        message: "Trainer not found",
+      });
     }
 
-    res.status(200).json(results);
-  });
-};
-const updateTrainer = (req, res) => {
-  const id = req.params.id;
-
-  trainerModel.updateTrainer(id, req.body, (err, result) => {
-    if (err) {
-      return res.status(500).json(err);
-    }
-
-    res.json({
+    res.status(200).json({
       message: "Trainer updated successfully",
+      trainer,
     });
-  });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 };
-const deleteTrainer = (req, res) => {
-  const id = req.params.id;
 
-  trainerModel.deleteTrainer(id, (err, result) => {
-    if (err) {
-      return res.status(500).json(err);
+// Delete Trainer
+const deleteTrainer = async (req, res) => {
+  try {
+    const trainer = await Trainer.findByIdAndDelete(req.params.id);
+
+    if (!trainer) {
+      return res.status(404).json({
+        message: "Trainer not found",
+      });
     }
 
-    res.json({
+    res.status(200).json({
       message: "Trainer deleted successfully",
     });
-  });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 };
+
 module.exports = {
   addTrainer,
   getAllTrainers,

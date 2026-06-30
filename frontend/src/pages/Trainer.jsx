@@ -49,7 +49,7 @@ function Trainer() {
   };
 
   const handleEdit = (trainer) => {
-    setEditingId(trainer.trainer_id);
+    setEditingId(trainer._id);
     const dateObj = new Date(trainer.joining_date);
     const formattedDate = dateObj.toISOString().split('T')[0];
     setEditForm({
@@ -319,10 +319,12 @@ function Trainer() {
           ) : (
             <div className="cards-grid">
               {trainers.map((t) => (
-                <div className="data-card" key={t.trainer_id}>
+                <div className="data-card" key={t._id}>
                   <div className="data-card-header">
                     <div>
-                      <span className="data-card-subtitle">#{t.trainer_id}</span>
+                      <span className="data-card-subtitle">
+                        {t.specialization}
+                      </span>
                       <h4 className="data-card-title">{t.full_name}</h4>
                     </div>
                     <span className={`status-badge status-${t.status?.toLowerCase() || "inactive"}`}>
@@ -362,7 +364,7 @@ function Trainer() {
                     </button>
                     <button
                       className="button-sm button-sm-danger"
-                      onClick={() => handleDeleteTrainer(t.trainer_id)}
+                      onClick={() => handleDeleteTrainer(t._id)}
                     >
                       Delete
                     </button>

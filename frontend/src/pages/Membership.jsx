@@ -44,10 +44,10 @@ function Membership() {
   };
 
   const handleEdit = (plan) => {
-    setEditingId(plan.plan_id);
+    setEditingId(plan._id);
     setEditForm({
-      plan_name: plan.plan_name,
-      price: plan.price.toString(),
+      price: String(plan.price),
+      duration_months: String(plan.duration_months),
       duration_months: plan.duration_months.toString(),
       description: plan.description,
       status: plan.status
@@ -278,10 +278,12 @@ function Membership() {
           ) : (
             <div className="cards-grid">
               {plans.map((p) => (
-                <div className="data-card" key={p.plan_id}>
+                <div className="data-card" key={p._id}>
                   <div className="data-card-header">
                     <div>
-                      <span className="data-card-subtitle">#{p.plan_id}</span>
+                      <span className="data-card-subtitle">
+                        {p.duration_months} Membership Plan
+                      </span>
                       <h4 className="data-card-title">{p.plan_name}</h4>
                     </div>
                     <span className={`status-badge status-${p.status?.toLowerCase() || "inactive"}`}>
@@ -290,7 +292,7 @@ function Membership() {
                   </div>
                   <div className="data-card-body">
                     <div className="data-card-price">
-                      ₹{p.price.toLocaleString()}
+                      ₹{Number(p.price).toLocaleString()}
                       <span style={{ fontSize: "14px", fontWeight: "normal", color: "#A1A1AA" }}>
                         {" "}
                         / {p.duration_months} {p.duration_months === 1 ? "Month" : "Months"}
@@ -307,7 +309,7 @@ function Membership() {
                     </button>
                     <button
                       className="button-sm button-sm-danger"
-                      onClick={() => handleDeletePlan(p.plan_id)}
+                      onClick={() => handleDeletePlan(p._id)}
                     >
                       Delete
                     </button>
