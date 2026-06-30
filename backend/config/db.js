@@ -1,19 +1,19 @@
-const mysql = require("mysql2");
+// backend/config/db.js
+// MongoDB connection using Mongoose. Replaces the old mysql2 pool.
+// NOTE: This is a shared file — coordinate with your team since other
+// modules (Members, Trainers, Auth, etc.) will also import this connection.
 
-const connection = mysql.createConnection({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-});
+const mongoose = require('mongoose');
+require('dotenv').config();
 
-connection.connect((err) => {
-  if (err) {
-    console.error("Database connection failed:", err);
-    return;
-  }
+const connectDB = async () => {
+    try {
+        await mongoose.connect(process.env.MONGODB_URI);
+        console.log('✅ MongoDB connected successfully');
+    } catch (err) {
+        console.error('❌ MongoDB connection error:', err.message);
+        process.exit(1);
+    }
+};
 
-  console.log("MySQL Connected Successfully");
-});
-
-module.exports = connection;
+module.exports = connectDB;

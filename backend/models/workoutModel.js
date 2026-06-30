@@ -1,409 +1,260 @@
 // backend/models/workoutModel.js
-// All workout-related database operations using callback-based mysql2.
+// All Mongoose schemas for the Workout module: Exercise library,
+// WorkoutPlan (with embedded plan-exercise subdocuments), and
+// MemberWorkoutAssignment. Combined into one file to match the
+// original MVC naming convention (workoutModel.js).
 
-const db = require('../config/db');
+const mongoose = require('mongoose');
+const { Schema } = mongoose;
 
 // ═══════════════════════════════════════════════════════════
 //  EXERCISE LIBRARY
 // ═══════════════════════════════════════════════════════════
 
-/**
- * Paginated list with optional search / filter.
- */
-const getExercises = (filters, callback) => {
-    const { search, category, difficulty, page, limit } = filters;
-    const offset = (page - 1) * limit;
-    const params = [];
+const exerciseSchema = new Schema(
+    {
+        name: {
+            type: String,
+            required: true,
+            trim: true,
+            maxlength: 150,
+        },
+        category: {
+            type: String,
+            required: true,
+            enum: ['Chest', 'Back', 'Shoulders', 'Arms', 'Legs', 'Core', 'Cardio', 'Full Body', 'Flexibility'],
+            default: 'Full Body',
+        },
+        muscleGroup: {
+            type: String,
+            default: null,
+            maxlength: 100,
+        },
+        equipment: {
+            type: String,
+            default: null,
+            maxlength: 100,
+        },
+        difficulty: {
+            type: String,
+            required: true,
+            enum: ['Beginner', 'Intermediate', 'Advanced'],
+            default: 'Beginner',
+        },
+        description: {
+            type: String,
+            default: null,
+        },
+        instructions: {
+            type: String,
+            default: null,
+        },
+        videoUrl: {
+            type: String,
+            default: null,
+        },
+        imageUrl: {
+            type: String,
+            default: null,
+        },
+        isActive: {
+            type: Boolean,
+            default: true,
+        },
+    },
+    { timestamps: true }
+);
 
-    let sql = `
-        SELECT * FROM exercises WHERE is_active = 1
-    `;
+exerciseSchema.index({ category: 1 });
+exerciseSchema.index({ difficulty: 1 });
+exerciseSchema.index({ name: 'text', muscleGroup: 'text', equipment: 'text' }); // for search
 
-    if (search) {
-        sql += ` AND (name LIKE ? OR muscle_group LIKE ? OR equipment LIKE ?)`;
-        const like = `%${search}%`;
-        params.push(like, like, like);
-    }
-    if (category) {
-        sql += ` AND category = ?`;
-        params.push(category);
-    }
-    if (difficulty) {
-        sql += ` AND difficulty = ?`;
-        params.push(difficulty);
-    }
-
-    const countSql = `SELECT COUNT(*) AS total FROM (${sql}) AS sub`;
-
-    db.query(countSql, params, (err, countResult) => {
-        if (err) return callback(err);
-        const total = countResult[0].total;
-
-        sql += ` ORDER BY category, name LIMIT ? OFFSET ?`;
-        params.push(limit, offset);
-
-        db.query(sql, params, (err2, rows) => {
-            if (err2) return callback(err2);
-            callback(null, { rows, total, page, limit });
-        });
-    });
-};
-
-const getAllExercises = (callback) => {
-    db.query(
-        'SELECT id, name, category, difficulty, muscle_group, equipment FROM exercises WHERE is_active = 1 ORDER BY category, name',
-        [],
-        callback
-    );
-};
-
-const getExerciseById = (id, callback) => {
-    db.query('SELECT * FROM exercises WHERE id = ? AND is_active = 1 LIMIT 1', [id], callback);
-};
-
-const createExercise = (data, callback) => {
-    const { name, category, muscle_group, equipment, difficulty, description, instructions, video_url, image_url } = data;
-    const sql = `
-        INSERT INTO exercises (name, category, muscle_group, equipment, difficulty, description, instructions, video_url, image_url)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-    db.query(sql, [name, category, muscle_group, equipment, difficulty, description, instructions, video_url, image_url], callback);
-};
-
-const updateExercise = (id, data, callback) => {
-    const { name, category, muscle_group, equipment, difficulty, description, instructions, video_url, image_url } = data;
-    const sql = `
-        UPDATE exercises
-        SET name = ?, category = ?, muscle_group = ?, equipment = ?,
-            difficulty = ?, description = ?, instructions = ?,
-            video_url = ?, image_url = ?
-        WHERE id = ?
-    `;
-    db.query(sql, [name, category, muscle_group, equipment, difficulty, description, instructions, video_url, image_url, id], callback);
-};
-
-const deleteExercise = (id, callback) => {
-    // Soft delete
-    db.query('UPDATE exercises SET is_active = 0 WHERE id = ?', [id], callback);
-};
+const Exercise = mongoose.model('Exercise', exerciseSchema);
 
 // ═══════════════════════════════════════════════════════════
-//  WORKOUT PLANS
+//  WORKOUT PLANS (with embedded plan-exercise subdocuments)
 // ═══════════════════════════════════════════════════════════
 
-const getWorkoutPlans = (filters, callback) => {
-    const { search, goal, difficulty, page, limit } = filters;
-    const offset = (page - 1) * limit;
-    const params = [];
+// Subdocument: an exercise as it appears inside a plan.
+// Replaces the old workout_plan_exercises junction table —
+// since plan-exercises always belong to exactly one plan and
+// are always fetched together with it, they're embedded here
+// instead of living in their own collection.
+const planExerciseSchema = new Schema(
+    {
+        exercise: {
+            type: Schema.Types.ObjectId,
+            ref: 'Exercise',
+            required: true,
+        },
+        sets: {
+            type: Number,
+            required: true,
+            default: 3,
+            min: 1,
+        },
+        reps: {
+            type: Number,
+            default: null, // null when timed
+        },
+        durationSecs: {
+            type: Number,
+            default: null, // null when rep-based
+        },
+        restSecs: {
+            type: Number,
+            default: 60,
+        },
+        dayNumber: {
+            type: Number,
+            required: true,
+            default: 1,
+            min: 1,
+            max: 7,
+        },
+        orderIndex: {
+            type: Number,
+            required: true,
+            default: 1,
+        },
+        notes: {
+            type: String,
+            default: null,
+            maxlength: 255,
+        },
+    },
+    { timestamps: true, _id: true } // each subdocument keeps its own _id for individual update/delete
+);
 
-    let sql = `
-        SELECT
-            wp.*,
-            CONCAT(u.first_name, ' ', u.last_name) AS created_by_name,
-            (SELECT COUNT(*) FROM workout_plan_exercises wpe WHERE wpe.workout_plan_id = wp.id) AS exercise_count,
-            (SELECT COUNT(*) FROM member_workout_assignments mwa WHERE mwa.workout_plan_id = wp.id AND mwa.status = 'Active') AS active_assignments
-        FROM workout_plans wp
-        LEFT JOIN users u ON wp.created_by = u.id
-        WHERE wp.is_active = 1
-    `;
+const workoutPlanSchema = new Schema(
+    {
+        name: {
+            type: String,
+            required: true,
+            trim: true,
+            maxlength: 150,
+        },
+        description: {
+            type: String,
+            default: null,
+        },
+        goal: {
+            type: String,
+            required: true,
+            enum: ['Weight Loss', 'Muscle Gain', 'Endurance', 'Flexibility', 'General Fitness', 'Strength'],
+            default: 'General Fitness',
+        },
+        difficulty: {
+            type: String,
+            required: true,
+            enum: ['Beginner', 'Intermediate', 'Advanced'],
+            default: 'Beginner',
+        },
+        durationWeeks: {
+            type: Number,
+            required: true,
+            default: 4,
+            min: 1,
+            max: 52,
+        },
+        daysPerWeek: {
+            type: Number,
+            required: true,
+            default: 3,
+            min: 1,
+            max: 7,
+        },
+        createdBy: {
+            type: Schema.Types.ObjectId,
+            ref: 'User', // assumes Auth module exports a 'User' model
+            default: null,
+        },
+        isActive: {
+            type: Boolean,
+            default: true,
+        },
+        exercises: {
+            type: [planExerciseSchema],
+            default: [],
+        },
+    },
+    { timestamps: true }
+);
 
-    if (search) {
-        sql += ` AND (wp.name LIKE ? OR wp.description LIKE ?)`;
-        const like = `%${search}%`;
-        params.push(like, like);
-    }
-    if (goal) {
-        sql += ` AND wp.goal = ?`;
-        params.push(goal);
-    }
-    if (difficulty) {
-        sql += ` AND wp.difficulty = ?`;
-        params.push(difficulty);
-    }
+workoutPlanSchema.index({ name: 'text', description: 'text' });
+workoutPlanSchema.index({ goal: 1 });
+workoutPlanSchema.index({ difficulty: 1 });
 
-    const countSql = `SELECT COUNT(*) AS total FROM (${sql}) AS sub`;
+// Virtual: total exercise count
+workoutPlanSchema.virtual('exerciseCount').get(function () {
+    return this.exercises?.length || 0;
+});
 
-    db.query(countSql, params, (err, countResult) => {
-        if (err) return callback(err);
-        const total = countResult[0].total;
+workoutPlanSchema.set('toJSON', { virtuals: true });
+workoutPlanSchema.set('toObject', { virtuals: true });
 
-        sql += ` ORDER BY wp.created_at DESC LIMIT ? OFFSET ?`;
-        params.push(limit, offset);
-
-        db.query(sql, params, (err2, rows) => {
-            if (err2) return callback(err2);
-            callback(null, { rows, total, page, limit });
-        });
-    });
-};
-
-const getWorkoutPlanById = (id, callback) => {
-    const sql = `
-        SELECT
-            wp.*,
-            CONCAT(u.first_name, ' ', u.last_name) AS created_by_name
-        FROM workout_plans wp
-        LEFT JOIN users u ON wp.created_by = u.id
-        WHERE wp.id = ? AND wp.is_active = 1
-        LIMIT 1
-    `;
-    db.query(sql, [id], (err, planRows) => {
-        if (err) return callback(err);
-        if (planRows.length === 0) return callback(null, null);
-
-        // Also fetch exercises for this plan
-        const exerciseSql = `
-            SELECT
-                wpe.*,
-                e.name          AS exercise_name,
-                e.category      AS exercise_category,
-                e.difficulty    AS exercise_difficulty,
-                e.muscle_group,
-                e.equipment,
-                e.description   AS exercise_description,
-                e.video_url,
-                e.image_url
-            FROM workout_plan_exercises wpe
-            INNER JOIN exercises e ON wpe.exercise_id = e.id
-            WHERE wpe.workout_plan_id = ?
-            ORDER BY wpe.day_number, wpe.order_index
-        `;
-        db.query(exerciseSql, [id], (err2, exRows) => {
-            if (err2) return callback(err2);
-            const plan = planRows[0];
-            plan.exercises = exRows;
-            callback(null, plan);
-        });
-    });
-};
-
-const createWorkoutPlan = (data, callback) => {
-    const { name, description, goal, difficulty, duration_weeks, days_per_week, created_by } = data;
-    const sql = `
-        INSERT INTO workout_plans (name, description, goal, difficulty, duration_weeks, days_per_week, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    `;
-    db.query(sql, [name, description, goal, difficulty, duration_weeks, days_per_week, created_by || null], callback);
-};
-
-const updateWorkoutPlan = (id, data, callback) => {
-    const { name, description, goal, difficulty, duration_weeks, days_per_week } = data;
-    const sql = `
-        UPDATE workout_plans
-        SET name = ?, description = ?, goal = ?, difficulty = ?,
-            duration_weeks = ?, days_per_week = ?
-        WHERE id = ?
-    `;
-    db.query(sql, [name, description, goal, difficulty, duration_weeks, days_per_week, id], callback);
-};
-
-const deleteWorkoutPlan = (id, callback) => {
-    db.query('UPDATE workout_plans SET is_active = 0 WHERE id = ?', [id], callback);
-};
-
-// ═══════════════════════════════════════════════════════════
-//  WORKOUT PLAN EXERCISES (junction)
-// ═══════════════════════════════════════════════════════════
-
-const addExerciseToPlan = (data, callback) => {
-    const { workout_plan_id, exercise_id, sets, reps, duration_secs, rest_secs, day_number, order_index, notes } = data;
-    const sql = `
-        INSERT INTO workout_plan_exercises
-            (workout_plan_id, exercise_id, sets, reps, duration_secs, rest_secs, day_number, order_index, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-    db.query(sql, [workout_plan_id, exercise_id, sets, reps || null, duration_secs || null, rest_secs || 60, day_number || 1, order_index || 1, notes || null], callback);
-};
-
-const updatePlanExercise = (id, data, callback) => {
-    const { sets, reps, duration_secs, rest_secs, day_number, order_index, notes } = data;
-    const sql = `
-        UPDATE workout_plan_exercises
-        SET sets = ?, reps = ?, duration_secs = ?, rest_secs = ?,
-            day_number = ?, order_index = ?, notes = ?
-        WHERE id = ?
-    `;
-    db.query(sql, [sets, reps || null, duration_secs || null, rest_secs, day_number, order_index, notes || null, id], callback);
-};
-
-const removeExerciseFromPlan = (id, callback) => {
-    db.query('DELETE FROM workout_plan_exercises WHERE id = ?', [id], callback);
-};
-
-const getPlanExercises = (planId, callback) => {
-    const sql = `
-        SELECT
-            wpe.*,
-            e.name       AS exercise_name,
-            e.category,
-            e.difficulty,
-            e.muscle_group,
-            e.equipment,
-            e.image_url
-        FROM workout_plan_exercises wpe
-        INNER JOIN exercises e ON wpe.exercise_id = e.id
-        WHERE wpe.workout_plan_id = ?
-        ORDER BY wpe.day_number, wpe.order_index
-    `;
-    db.query(sql, [planId], callback);
-};
+const WorkoutPlan = mongoose.model('WorkoutPlan', workoutPlanSchema);
 
 // ═══════════════════════════════════════════════════════════
 //  MEMBER WORKOUT ASSIGNMENTS
 // ═══════════════════════════════════════════════════════════
+// Kept as a separate collection since a member can have many
+// assignments over time, and each assignment has its own
+// lifecycle/status independent of the plan itself.
 
-const getAssignments = (filters, callback) => {
-    const { memberId, status, page, limit } = filters;
-    const offset = (page - 1) * limit;
-    const params = [];
+const memberWorkoutAssignmentSchema = new Schema(
+    {
+        member: {
+            type: Schema.Types.ObjectId,
+            ref: 'Member',
+            required: true,
+        },
+        workoutPlan: {
+            type: Schema.Types.ObjectId,
+            ref: 'WorkoutPlan',
+            required: true,
+        },
+        assignedBy: {
+            type: Schema.Types.ObjectId,
+            ref: 'User',
+            default: null,
+        },
+        startDate: {
+            type: Date,
+            required: true,
+        },
+        endDate: {
+            type: Date,
+            default: null,
+        },
+        status: {
+            type: String,
+            enum: ['Active', 'Completed', 'Paused', 'Cancelled'],
+            default: 'Active',
+        },
+        notes: {
+            type: String,
+            default: null,
+            maxlength: 500,
+        },
+    },
+    { timestamps: true }
+);
 
-    let sql = `
-        SELECT
-            mwa.*,
-            CONCAT(m.first_name, ' ', m.last_name)  AS member_name,
-            m.email                                  AS member_email,
-            m.profile_image                          AS member_image,
-            wp.name                                  AS plan_name,
-            wp.goal                                  AS plan_goal,
-            wp.difficulty                            AS plan_difficulty,
-            wp.duration_weeks,
-            CONCAT(u.first_name, ' ', u.last_name)  AS assigned_by_name
-        FROM member_workout_assignments mwa
-        INNER JOIN members m ON mwa.member_id = m.id
-        INNER JOIN workout_plans wp ON mwa.workout_plan_id = wp.id
-        LEFT JOIN users u ON mwa.assigned_by = u.id
-        WHERE 1=1
-    `;
+memberWorkoutAssignmentSchema.index({ member: 1 });
+memberWorkoutAssignmentSchema.index({ workoutPlan: 1 });
+memberWorkoutAssignmentSchema.index({ status: 1 });
 
-    if (memberId) {
-        sql += ` AND mwa.member_id = ?`;
-        params.push(memberId);
-    }
-    if (status) {
-        sql += ` AND mwa.status = ?`;
-        params.push(status);
-    }
-
-    const countSql = `SELECT COUNT(*) AS total FROM (${sql}) AS sub`;
-    db.query(countSql, params, (err, countResult) => {
-        if (err) return callback(err);
-        const total = countResult[0].total;
-
-        sql += ` ORDER BY mwa.created_at DESC LIMIT ? OFFSET ?`;
-        params.push(limit, offset);
-
-        db.query(sql, params, (err2, rows) => {
-            if (err2) return callback(err2);
-            callback(null, { rows, total, page, limit });
-        });
-    });
-};
-
-const getAssignmentById = (id, callback) => {
-    const sql = `
-        SELECT
-            mwa.*,
-            CONCAT(m.first_name, ' ', m.last_name)  AS member_name,
-            m.email                                  AS member_email,
-            wp.name                                  AS plan_name,
-            wp.goal                                  AS plan_goal,
-            wp.difficulty                            AS plan_difficulty,
-            wp.duration_weeks,
-            wp.days_per_week,
-            CONCAT(u.first_name, ' ', u.last_name)  AS assigned_by_name
-        FROM member_workout_assignments mwa
-        INNER JOIN members m ON mwa.member_id = m.id
-        INNER JOIN workout_plans wp ON mwa.workout_plan_id = wp.id
-        LEFT JOIN users u ON mwa.assigned_by = u.id
-        WHERE mwa.id = ?
-        LIMIT 1
-    `;
-    db.query(sql, [id], callback);
-};
-
-const getMemberAssignments = (memberId, callback) => {
-    const sql = `
-        SELECT
-            mwa.*,
-            wp.name         AS plan_name,
-            wp.goal         AS plan_goal,
-            wp.difficulty   AS plan_difficulty,
-            wp.duration_weeks,
-            wp.days_per_week,
-            (SELECT COUNT(*) FROM workout_plan_exercises wpe WHERE wpe.workout_plan_id = wp.id) AS exercise_count
-        FROM member_workout_assignments mwa
-        INNER JOIN workout_plans wp ON mwa.workout_plan_id = wp.id
-        WHERE mwa.member_id = ?
-        ORDER BY mwa.created_at DESC
-    `;
-    db.query(sql, [memberId], callback);
-};
-
-const assignWorkout = (data, callback) => {
-    const { member_id, workout_plan_id, assigned_by, start_date, end_date, notes } = data;
-    const sql = `
-        INSERT INTO member_workout_assignments
-            (member_id, workout_plan_id, assigned_by, start_date, end_date, notes)
-        VALUES (?, ?, ?, ?, ?, ?)
-    `;
-    db.query(sql, [member_id, workout_plan_id, assigned_by || null, start_date, end_date || null, notes || null], callback);
-};
-
-const updateAssignment = (id, data, callback) => {
-    const { status, start_date, end_date, notes } = data;
-    const sql = `
-        UPDATE member_workout_assignments
-        SET status = ?, start_date = ?, end_date = ?, notes = ?
-        WHERE id = ?
-    `;
-    db.query(sql, [status, start_date, end_date || null, notes || null, id], callback);
-};
-
-const deleteAssignment = (id, callback) => {
-    db.query('DELETE FROM member_workout_assignments WHERE id = ?', [id], callback);
-};
+const MemberWorkoutAssignment = mongoose.model('MemberWorkoutAssignment', memberWorkoutAssignmentSchema);
 
 // ═══════════════════════════════════════════════════════════
-//  DASHBOARD STATS
+//  EXPORTS
 // ═══════════════════════════════════════════════════════════
-
-const getWorkoutDashboardStats = (callback) => {
-    const sql = `
-        SELECT
-            (SELECT COUNT(*) FROM workout_plans WHERE is_active = 1)                           AS total_plans,
-            (SELECT COUNT(*) FROM exercises WHERE is_active = 1)                               AS total_exercises,
-            (SELECT COUNT(*) FROM member_workout_assignments WHERE status = 'Active')          AS active_assignments,
-            (SELECT COUNT(*) FROM member_workout_assignments WHERE status = 'Completed')       AS completed_assignments
-    `;
-    db.query(sql, [], callback);
-};
+// workoutController.js imports these three models from this single file:
+//   const { Exercise, WorkoutPlan, MemberWorkoutAssignment } = require('../models/workoutModel');
 
 module.exports = {
-    // Exercises
-    getExercises,
-    getAllExercises,
-    getExerciseById,
-    createExercise,
-    updateExercise,
-    deleteExercise,
-    // Plans
-    getWorkoutPlans,
-    getWorkoutPlanById,
-    createWorkoutPlan,
-    updateWorkoutPlan,
-    deleteWorkoutPlan,
-    // Plan exercises
-    addExerciseToPlan,
-    updatePlanExercise,
-    removeExerciseFromPlan,
-    getPlanExercises,
-    // Assignments
-    getAssignments,
-    getAssignmentById,
-    getMemberAssignments,
-    assignWorkout,
-    updateAssignment,
-    deleteAssignment,
-    // Stats
-    getWorkoutDashboardStats,
+    Exercise,
+    WorkoutPlan,
+    MemberWorkoutAssignment,
 };

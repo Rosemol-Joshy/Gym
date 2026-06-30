@@ -58,6 +58,9 @@ router.get('/plans/:planId/exercises',  getPlanExercises);
 router.post('/plans/:planId/exercises', addExerciseToPlan);
 
 // ── Plan Exercise (individual update / remove) ─────────────
+// NOTE: Mongo stores plan-exercises as embedded subdocuments inside
+// WorkoutPlan, so these calls must also pass the parent plan_id
+// (in the body for PUT, as a query param for DELETE) to locate it.
 router.put('/plan-exercises/:id',    updatePlanExercise);
 router.delete('/plan-exercises/:id', removeExerciseFromPlan);
 

@@ -1,7 +1,12 @@
 // backend/controllers/attendanceController.js
-// Handles all attendance HTTP request logic. Clean separation from model/routes.
+// Handles all attendance HTTP request logic using Mongoose (async/await).
+// Note: model layer logic now lives directly here since Mongoose models
+// are themselves the data-access layer — there's no separate callback-based
+// model file needed (Attendance.js IS the model).
 
-const AttendanceModel = require('../models/attendanceModel');
+const Attendance = require('../models/attendanceModel');
+
+const todayStr = () => new Date().toISOString().split('T')[0];
 
 // ─────────────────────────────────────────────────────────────
 // CHECK-IN
@@ -11,46 +16,46 @@ const AttendanceModel = require('../models/attendanceModel');
  * POST /api/attendance/checkin
  * Body: { member_id, notes? }
  */
-const checkIn = (req, res) => {
+const checkIn = async (req, res) => {
     const { member_id, notes } = req.body;
 
     if (!member_id) {
         return res.status(400).json({ success: false, message: 'member_id is required.' });
     }
 
-    // Prevent duplicate check-in for today
-    AttendanceModel.findTodayAttendance(member_id, (err, existing) => {
-        if (err) {
-            console.error('checkIn - findTodayAttendance error:', err);
-            return res.status(500).json({ success: false, message: 'Database error.' });
-        }
+    try {
+        const date = todayStr();
 
-        if (existing.length > 0) {
+        const existing = await Attendance.findOne({ member: member_id, date });
+        if (existing) {
             return res.status(409).json({
                 success: false,
                 message: 'Member has already checked in today.',
-                attendance: existing[0],
+                attendance: existing,
             });
         }
 
-        AttendanceModel.checkIn(member_id, notes, (err2, result) => {
-            if (err2) {
-                console.error('checkIn - insert error:', err2);
-                return res.status(500).json({ success: false, message: 'Failed to check in.' });
-            }
-
-            AttendanceModel.getAttendanceById(result.insertId, (err3, rows) => {
-                if (err3 || rows.length === 0) {
-                    return res.status(201).json({ success: true, message: 'Check-in successful.' });
-                }
-                return res.status(201).json({
-                    success: true,
-                    message: 'Check-in successful.',
-                    attendance: rows[0],
-                });
-            });
+        const record = await Attendance.create({
+            member: member_id,
+            checkIn: new Date(),
+            date,
+            notes: notes || null,
         });
-    });
+
+        const populated = await record.populate('member', 'firstName lastName email profileImage phone');
+
+        return res.status(201).json({
+            success: true,
+            message: 'Check-in successful.',
+            attendance: populated,
+        });
+    } catch (err) {
+        console.error('checkIn error:', err);
+        if (err.code === 11000) {
+            return res.status(409).json({ success: false, message: 'Member has already checked in today.' });
+        }
+        return res.status(500).json({ success: false, message: 'Failed to check in.' });
+    }
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -60,42 +65,37 @@ const checkIn = (req, res) => {
 /**
  * PUT /api/attendance/checkout/:memberId
  */
-const checkOut = (req, res) => {
-    const memberId = req.params.memberId;
+const checkOut = async (req, res) => {
+    const { memberId } = req.params;
 
-    AttendanceModel.findOpenAttendance(memberId, (err, rows) => {
-        if (err) {
-            console.error('checkOut - findOpenAttendance error:', err);
-            return res.status(500).json({ success: false, message: 'Database error.' });
-        }
+    try {
+        const record = await Attendance.findOne({
+            member: memberId,
+            date: todayStr(),
+            checkOut: null,
+        });
 
-        if (rows.length === 0) {
+        if (!record) {
             return res.status(404).json({
                 success: false,
                 message: 'No open check-in found for this member today.',
             });
         }
 
-        const attendanceId = rows[0].id;
+        record.checkOut = new Date();
+        await record.save();
 
-        AttendanceModel.checkOut(attendanceId, (err2, result) => {
-            if (err2) {
-                console.error('checkOut - update error:', err2);
-                return res.status(500).json({ success: false, message: 'Failed to check out.' });
-            }
-            if (result.affectedRows === 0) {
-                return res.status(400).json({ success: false, message: 'Already checked out.' });
-            }
+        const populated = await record.populate('member', 'firstName lastName email profileImage phone');
 
-            AttendanceModel.getAttendanceById(attendanceId, (err3, updated) => {
-                return res.status(200).json({
-                    success: true,
-                    message: 'Check-out successful.',
-                    attendance: updated[0] || null,
-                });
-            });
+        return res.status(200).json({
+            success: true,
+            message: 'Check-out successful.',
+            attendance: populated,
         });
-    });
+    } catch (err) {
+        console.error('checkOut error:', err);
+        return res.status(500).json({ success: false, message: 'Failed to check out.' });
+    }
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -106,54 +106,93 @@ const checkOut = (req, res) => {
  * GET /api/attendance
  * Query: search, date, startDate, endDate, memberId, page, limit
  */
-const getAttendanceList = (req, res) => {
-    const filters = {
-        search:    req.query.search    || '',
-        date:      req.query.date      || '',
-        startDate: req.query.startDate || '',
-        endDate:   req.query.endDate   || '',
-        memberId:  req.query.memberId  || '',
-        page:      parseInt(req.query.page)  || 1,
-        limit:     parseInt(req.query.limit) || 20,
-    };
+const getAttendanceList = async (req, res) => {
+    const {
+        search = '', date = '', startDate = '', endDate = '',
+        memberId = '', page = 1, limit = 20,
+    } = req.query;
 
-    AttendanceModel.getAttendanceList(filters, (err, data) => {
-        if (err) {
-            console.error('getAttendanceList error:', err);
-            return res.status(500).json({ success: false, message: 'Database error.' });
+    try {
+        const filter = {};
+
+        if (memberId) filter.member = memberId;
+        if (date) filter.date = date;
+        if (startDate || endDate) {
+            filter.date = {};
+            if (startDate) filter.date.$gte = startDate;
+            if (endDate) filter.date.$lte = endDate;
         }
-        return res.status(200).json({ success: true, data });
-    });
+
+        let query = Attendance.find(filter).populate('member', 'firstName lastName email profileImage phone');
+
+        // Search by member name/email requires filtering populated fields in-memory,
+        // since Mongoose can't filter a $lookup-style populate directly.
+        if (search) {
+            const all = await query.sort({ checkIn: -1 }).lean();
+            const regex = new RegExp(search, 'i');
+            const filtered = all.filter(r =>
+                r.member && (
+                    regex.test(r.member.firstName) ||
+                    regex.test(r.member.lastName) ||
+                    regex.test(r.member.email)
+                )
+            );
+            const total = filtered.length;
+            const start = (page - 1) * limit;
+            const rows = filtered.slice(start, start + Number(limit)).map(formatAttendance);
+
+            return res.status(200).json({ success: true, data: { rows, total, page: Number(page), limit: Number(limit) } });
+        }
+
+        const total = await Attendance.countDocuments(filter);
+        const rows = await query
+            .sort({ checkIn: -1 })
+            .skip((page - 1) * limit)
+            .limit(Number(limit))
+            .lean();
+
+        return res.status(200).json({
+            success: true,
+            data: { rows: rows.map(formatAttendance), total, page: Number(page), limit: Number(limit) },
+        });
+    } catch (err) {
+        console.error('getAttendanceList error:', err);
+        return res.status(500).json({ success: false, message: 'Database error.' });
+    }
 };
 
 /**
  * GET /api/attendance/member/:memberId
  */
-const getMemberHistory = (req, res) => {
-    const { memberId } = req.params;
-    AttendanceModel.getMemberAttendanceHistory(memberId, (err, rows) => {
-        if (err) {
-            console.error('getMemberHistory error:', err);
-            return res.status(500).json({ success: false, message: 'Database error.' });
-        }
-        return res.status(200).json({ success: true, data: rows });
-    });
+const getMemberHistory = async (req, res) => {
+    try {
+        const rows = await Attendance.find({ member: req.params.memberId })
+            .sort({ checkIn: -1 })
+            .lean();
+        return res.status(200).json({ success: true, data: rows.map(formatAttendance) });
+    } catch (err) {
+        console.error('getMemberHistory error:', err);
+        return res.status(500).json({ success: false, message: 'Database error.' });
+    }
 };
 
 /**
  * GET /api/attendance/:id
  */
-const getAttendanceById = (req, res) => {
-    AttendanceModel.getAttendanceById(req.params.id, (err, rows) => {
-        if (err) {
-            console.error('getAttendanceById error:', err);
-            return res.status(500).json({ success: false, message: 'Database error.' });
-        }
-        if (rows.length === 0) {
+const getAttendanceById = async (req, res) => {
+    try {
+        const record = await Attendance.findById(req.params.id)
+            .populate('member', 'firstName lastName email profileImage phone')
+            .lean();
+
+        if (!record) {
             return res.status(404).json({ success: false, message: 'Attendance record not found.' });
         }
-        return res.status(200).json({ success: true, data: rows[0] });
-    });
+        return res.status(200).json({ success: true, data: formatAttendance(record) });
+    } catch (err) {
+        console.error('getAttendanceById error:', err);
+        return res.status(500).json({ success: false, message: 'Database error.' });
+    }
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -164,7 +203,7 @@ const getAttendanceById = (req, res) => {
  * POST /api/attendance/manual
  * Body: { member_id, check_in, check_out?, date, notes? }
  */
-const createManual = (req, res) => {
+const createManual = async (req, res) => {
     const { member_id, check_in, check_out, date, notes } = req.body;
 
     if (!member_id || !check_in || !date) {
@@ -174,30 +213,37 @@ const createManual = (req, res) => {
         });
     }
 
-    AttendanceModel.createManualAttendance({ member_id, check_in, check_out, date, notes }, (err, result) => {
-        if (err) {
-            console.error('createManual error:', err);
-            if (err.code === 'ER_DUP_ENTRY') {
-                return res.status(409).json({
-                    success: false,
-                    message: 'Attendance record already exists for this member on that date.',
-                });
-            }
-            return res.status(500).json({ success: false, message: 'Failed to create attendance record.' });
-        }
+    try {
+        const record = await Attendance.create({
+            member: member_id,
+            checkIn: new Date(check_in),
+            checkOut: check_out ? new Date(check_out) : null,
+            date,
+            notes: notes || null,
+        });
+
         return res.status(201).json({
             success: true,
             message: 'Manual attendance record created.',
-            id: result.insertId,
+            id: record._id,
         });
-    });
+    } catch (err) {
+        console.error('createManual error:', err);
+        if (err.code === 11000) {
+            return res.status(409).json({
+                success: false,
+                message: 'Attendance record already exists for this member on that date.',
+            });
+        }
+        return res.status(500).json({ success: false, message: 'Failed to create attendance record.' });
+    }
 };
 
 /**
  * PUT /api/attendance/:id
  * Body: { check_in, check_out?, notes? }
  */
-const updateAttendance = (req, res) => {
+const updateAttendance = async (req, res) => {
     const { id } = req.params;
     const { check_in, check_out, notes } = req.body;
 
@@ -205,32 +251,41 @@ const updateAttendance = (req, res) => {
         return res.status(400).json({ success: false, message: 'check_in is required.' });
     }
 
-    AttendanceModel.updateAttendance(id, { check_in, check_out, notes }, (err, result) => {
-        if (err) {
-            console.error('updateAttendance error:', err);
-            return res.status(500).json({ success: false, message: 'Failed to update attendance.' });
-        }
-        if (result.affectedRows === 0) {
+    try {
+        const record = await Attendance.findByIdAndUpdate(
+            id,
+            {
+                checkIn: new Date(check_in),
+                checkOut: check_out ? new Date(check_out) : null,
+                notes: notes || null,
+            },
+            { new: true }
+        );
+
+        if (!record) {
             return res.status(404).json({ success: false, message: 'Attendance record not found.' });
         }
         return res.status(200).json({ success: true, message: 'Attendance updated successfully.' });
-    });
+    } catch (err) {
+        console.error('updateAttendance error:', err);
+        return res.status(500).json({ success: false, message: 'Failed to update attendance.' });
+    }
 };
 
 /**
  * DELETE /api/attendance/:id
  */
-const deleteAttendance = (req, res) => {
-    AttendanceModel.deleteAttendance(req.params.id, (err, result) => {
-        if (err) {
-            console.error('deleteAttendance error:', err);
-            return res.status(500).json({ success: false, message: 'Failed to delete attendance.' });
-        }
-        if (result.affectedRows === 0) {
+const deleteAttendance = async (req, res) => {
+    try {
+        const record = await Attendance.findByIdAndDelete(req.params.id);
+        if (!record) {
             return res.status(404).json({ success: false, message: 'Attendance record not found.' });
         }
         return res.status(200).json({ success: true, message: 'Attendance record deleted.' });
-    });
+    } catch (err) {
+        console.error('deleteAttendance error:', err);
+        return res.status(500).json({ success: false, message: 'Failed to delete attendance.' });
+    }
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -240,92 +295,246 @@ const deleteAttendance = (req, res) => {
 /**
  * GET /api/attendance/stats/daily?date=YYYY-MM-DD
  */
-const getDailyStats = (req, res) => {
-    const date = req.query.date || null;
-    AttendanceModel.getDailyStats(date, (err, rows) => {
-        if (err) {
-            console.error('getDailyStats error:', err);
-            return res.status(500).json({ success: false, message: 'Database error.' });
-        }
-        return res.status(200).json({ success: true, data: rows[0] });
-    });
+const getDailyStats = async (req, res) => {
+    try {
+        const date = req.query.date || todayStr();
+
+        const records = await Attendance.find({ date }).lean();
+        const total = records.length;
+        const currentlyIn = records.filter(r => !r.checkOut).length;
+        const checkedOut = total - currentlyIn;
+
+        const durations = records
+            .filter(r => r.checkOut)
+            .map(r => Math.round((new Date(r.checkOut) - new Date(r.checkIn)) / 60000));
+
+        const avgDuration = durations.length
+            ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
+            : null;
+        const maxDuration = durations.length ? Math.max(...durations) : null;
+
+        return res.status(200).json({
+            success: true,
+            data: {
+                total_checkins: total,
+                currently_in: currentlyIn,
+                checked_out: checkedOut,
+                avg_duration_minutes: avgDuration,
+                max_duration_minutes: maxDuration,
+            },
+        });
+    } catch (err) {
+        console.error('getDailyStats error:', err);
+        return res.status(500).json({ success: false, message: 'Database error.' });
+    }
 };
 
 /**
  * GET /api/attendance/stats/monthly?year=YYYY&month=MM
  */
-const getMonthlyStats = (req, res) => {
-    const year  = req.query.year  || new Date().getFullYear();
-    const month = req.query.month || (new Date().getMonth() + 1);
+const getMonthlyStats = async (req, res) => {
+    try {
+        const year  = parseInt(req.query.year)  || new Date().getFullYear();
+        const month = parseInt(req.query.month) || (new Date().getMonth() + 1);
+        const monthStr = String(month).padStart(2, '0');
+        const prefix = `${year}-${monthStr}`;
 
-    AttendanceModel.getMonthlyStats(year, month, (err, daily) => {
-        if (err) {
-            console.error('getMonthlyStats error:', err);
-            return res.status(500).json({ success: false, message: 'Database error.' });
-        }
+        const records = await Attendance.find({ date: { $regex: `^${prefix}` } })
+            .populate('member', 'firstName lastName email profileImage')
+            .lean();
 
-        AttendanceModel.getTopMembersByMonth(year, month, 5, (err2, topMembers) => {
-            if (err2) return res.status(500).json({ success: false, message: 'Database error.' });
-
-            return res.status(200).json({ success: true, data: { daily, topMembers } });
+        // Group by day
+        const dayMap = {};
+        records.forEach(r => {
+            if (!dayMap[r.date]) dayMap[r.date] = [];
+            dayMap[r.date].push(r);
         });
-    });
+
+        const daily = Object.keys(dayMap).sort().map(day => {
+            const dayRecords = dayMap[day];
+            const durations = dayRecords
+                .filter(r => r.checkOut)
+                .map(r => Math.round((new Date(r.checkOut) - new Date(r.checkIn)) / 60000));
+            return {
+                day,
+                total_checkins: dayRecords.length,
+                avg_duration_minutes: durations.length
+                    ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
+                    : null,
+            };
+        });
+
+        // Top members
+        const memberMap = {};
+        records.forEach(r => {
+            if (!r.member) return;
+            const id = r.member._id.toString();
+            if (!memberMap[id]) {
+                memberMap[id] = {
+                    id,
+                    member_name: `${r.member.firstName} ${r.member.lastName}`,
+                    email: r.member.email,
+                    profile_image: r.member.profileImage,
+                    visits: 0,
+                };
+            }
+            memberMap[id].visits += 1;
+        });
+        const topMembers = Object.values(memberMap)
+            .sort((a, b) => b.visits - a.visits)
+            .slice(0, 5);
+
+        return res.status(200).json({ success: true, data: { daily, topMembers } });
+    } catch (err) {
+        console.error('getMonthlyStats error:', err);
+        return res.status(500).json({ success: false, message: 'Database error.' });
+    }
 };
 
 /**
  * GET /api/attendance/stats/weekly
  */
-const getWeeklyTrend = (req, res) => {
-    AttendanceModel.getWeeklyTrend((err, rows) => {
-        if (err) {
-            console.error('getWeeklyTrend error:', err);
-            return res.status(500).json({ success: false, message: 'Database error.' });
-        }
+const getWeeklyTrend = async (req, res) => {
+    try {
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+        const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
+
+        const records = await Attendance.find({ date: { $gte: sevenDaysAgoStr } }).lean();
+
+        const dayMap = {};
+        records.forEach(r => {
+            if (!dayMap[r.date]) dayMap[r.date] = 0;
+            dayMap[r.date] += 1;
+        });
+
+        const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+        const rows = Object.keys(dayMap).sort().map(day => ({
+            day,
+            day_name: dayNames[new Date(day).getDay()],
+            total: dayMap[day],
+        }));
+
         return res.status(200).json({ success: true, data: rows });
-    });
+    } catch (err) {
+        console.error('getWeeklyTrend error:', err);
+        return res.status(500).json({ success: false, message: 'Database error.' });
+    }
 };
 
 /**
  * GET /api/attendance/stats/peak-hours
  */
-const getPeakHours = (req, res) => {
-    AttendanceModel.getPeakHours((err, rows) => {
-        if (err) {
-            console.error('getPeakHours error:', err);
-            return res.status(500).json({ success: false, message: 'Database error.' });
-        }
+const getPeakHours = async (req, res) => {
+    try {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        const records = await Attendance.find({ checkIn: { $gte: thirtyDaysAgo } }).lean();
+
+        const hourMap = {};
+        records.forEach(r => {
+            const hour = new Date(r.checkIn).getHours();
+            hourMap[hour] = (hourMap[hour] || 0) + 1;
+        });
+
+        const rows = Object.keys(hourMap)
+            .map(h => ({ hour: Number(h), total: hourMap[h] }))
+            .sort((a, b) => a.hour - b.hour);
+
         return res.status(200).json({ success: true, data: rows });
-    });
+    } catch (err) {
+        console.error('getPeakHours error:', err);
+        return res.status(500).json({ success: false, message: 'Database error.' });
+    }
 };
 
 /**
  * GET /api/attendance/stats/dashboard
- * Aggregates daily + weekly into one call for the dashboard.
  */
-const getDashboardStats = (req, res) => {
-    const today = new Date().toISOString().split('T')[0];
+const getDashboardStats = async (req, res) => {
+    try {
+        const date = todayStr();
+        const records = await Attendance.find({ date }).lean();
+        const total = records.length;
+        const currentlyIn = records.filter(r => !r.checkOut).length;
+        const checkedOut = total - currentlyIn;
+        const durations = records
+            .filter(r => r.checkOut)
+            .map(r => Math.round((new Date(r.checkOut) - new Date(r.checkIn)) / 60000));
+        const avgDuration = durations.length
+            ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
+            : null;
 
-    AttendanceModel.getDailyStats(today, (err, dailyRows) => {
-        if (err) return res.status(500).json({ success: false, message: 'Database error.' });
+        // Weekly
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+        const weeklyRecords = await Attendance.find({
+            date: { $gte: sevenDaysAgo.toISOString().split('T')[0] },
+        }).lean();
+        const dayMap = {};
+        weeklyRecords.forEach(r => { dayMap[r.date] = (dayMap[r.date] || 0) + 1; });
+        const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+        const weekly = Object.keys(dayMap).sort().map(day => ({
+            day,
+            day_name: dayNames[new Date(day).getDay()],
+            total: dayMap[day],
+        }));
 
-        AttendanceModel.getWeeklyTrend((err2, weeklyRows) => {
-            if (err2) return res.status(500).json({ success: false, message: 'Database error.' });
-
-            AttendanceModel.getPeakHours((err3, peakRows) => {
-                if (err3) return res.status(500).json({ success: false, message: 'Database error.' });
-
-                return res.status(200).json({
-                    success: true,
-                    data: {
-                        daily:     dailyRows[0],
-                        weekly:    weeklyRows,
-                        peakHours: peakRows,
-                    },
-                });
-            });
+        // Peak hours
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const monthRecords = await Attendance.find({ checkIn: { $gte: thirtyDaysAgo } }).lean();
+        const hourMap = {};
+        monthRecords.forEach(r => {
+            const hour = new Date(r.checkIn).getHours();
+            hourMap[hour] = (hourMap[hour] || 0) + 1;
         });
-    });
+        const peakHours = Object.keys(hourMap)
+            .map(h => ({ hour: Number(h), total: hourMap[h] }))
+            .sort((a, b) => a.hour - b.hour);
+
+        return res.status(200).json({
+            success: true,
+            data: {
+                daily: {
+                    total_checkins: total,
+                    currently_in: currentlyIn,
+                    checked_out: checkedOut,
+                    avg_duration_minutes: avgDuration,
+                },
+                weekly,
+                peakHours,
+            },
+        });
+    } catch (err) {
+        console.error('getDashboardStats error:', err);
+        return res.status(500).json({ success: false, message: 'Database error.' });
+    }
 };
+
+// ─────────────────────────────────────────────────────────────
+// Helper: flatten populated member fields into the shape the
+// frontend already expects (so AttendanceTable.jsx needs no changes)
+// ─────────────────────────────────────────────────────────────
+function formatAttendance(r) {
+    const member = r.member && typeof r.member === 'object' ? r.member : null;
+    return {
+        id: r._id,
+        member_id: member ? member._id : r.member,
+        member_name: member ? `${member.firstName} ${member.lastName}` : null,
+        member_email: member ? member.email : null,
+        member_phone: member ? member.phone : null,
+        member_image: member ? member.profileImage : null,
+        check_in: r.checkIn,
+        check_out: r.checkOut,
+        date: r.date,
+        notes: r.notes,
+        duration_minutes: r.checkOut
+            ? Math.round((new Date(r.checkOut) - new Date(r.checkIn)) / 60000)
+            : Math.round((Date.now() - new Date(r.checkIn)) / 60000),
+    };
+}
 
 module.exports = {
     checkIn,

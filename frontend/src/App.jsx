@@ -1,8 +1,8 @@
 import { Routes, Route, Link, useLocation } from "react-router-dom";
-import PaymentManagement from "./pages/PaymentManagement";
-import AdminDashboard from "./pages/AdminDashboard";
-import TrainerDashboard from "./pages/TrainerDashboard";
-import MemberDashboard from "./pages/MemberDashboard";
+//import PaymentManagement from "./pages/PaymentManagement";
+//import AdminDashboard from "./pages/AdminDashboard";
+//import TrainerDashboard from "./pages/TrainerDashboard";
+//import MemberDashboard from "./pages/MemberDashboard";
 import { currentRole } from "./utils/role";
 import AttendancePage        from './pages/attendance/AttendancePage';
 import WorkoutPage           from './pages/workout/WorkoutPage';
@@ -72,15 +72,15 @@ function App() {
       </nav>
 
       <Routes>
-        <Route path="/" element={<AdminDashboard />} />
+        {/*<Route path="/" element={<AdminDashboard />} />
         <Route path="/trainer-dashboard" element={<TrainerDashboard />} />
         <Route path="/member-dashboard" element={<MemberDashboard />} />
-        <Route path="/payments" element={<PaymentManagement />} />
+        <Route path="/payments" element={<PaymentManagement />} /> */}
         <Route path="/attendance" element={<AttendancePage />} />
         <Route path="/workout" element={<WorkoutPage />} />
-        <Route path="/workout-plans/:id" element={<WorkoutPlanDetailPage />} />
-        <Route path="/exercises" element={<ExercisesPage />} />
-        <Route path="/assignments" element={<AssignmentsPage />} />
+        <Route path="/workout/workout-plans/:id" element={<WorkoutPlanDetailPage />} />
+        <Route path="/workout/exercises" element={<ExercisesPage />} />
+        <Route path="/workout/assignments" element={<AssignmentsPage />} />
       </Routes>
     </div>
   );
