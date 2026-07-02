@@ -1,7 +1,8 @@
 import "./pages.css";
-import { currentRole } from "../utils/role";
+import { getCurrentRole } from "../utils/role";
 
 function TrainerDashboard() {
+  const currentRole = getCurrentRole();
   if (currentRole !== "trainer") {
     return (
       <div className="page-wrapper">
@@ -16,20 +17,20 @@ function TrainerDashboard() {
     {
       id: 1,
       name: "Vishnu",
-      dueDate: "2026-06-20",
-      status: "Pending",
+      plan: "Gold Plan",
+      status: "Active",
     },
     {
       id: 2,
       name: "Arjun",
-      dueDate: "2026-06-20",
-      status: "Paid",
+      plan: "Silver Plan",
+      status: "Active",
     },
     {
       id: 3,
       name: "Rahul",
-      dueDate: "2026-06-25",
-      status: "Pending",
+      plan: "Gold Plan",
+      status: "Active",
     },
   ];
 
@@ -40,7 +41,7 @@ function TrainerDashboard() {
           <div>
             <h1 className="page-title">Trainer Dashboard</h1>
             <p className="page-subtitle">
-              Track member memberships and payment status
+              Track member memberships and performance
             </p>
           </div>
         </div>
@@ -69,20 +70,12 @@ function TrainerDashboard() {
               Follow up with members
             </p>
           </div>
-
-          <div className="form-card">
-            <h3>Pending Payments</h3>
-            <h2>3</h2>
-            <p className="page-subtitle">
-              Awaiting payment confirmation
-            </p>
-          </div>
         </div>
 
         <div className="table-card">
           <div className="table-card-header">
             <h3 className="table-card-title">
-              Members Due & Membership Status
+              Assigned Members & Plans
             </h3>
           </div>
 
@@ -100,10 +93,8 @@ function TrainerDashboard() {
                 </div>
                 <div className="data-card-body">
                   <div className="data-card-row">
-                    <span className="data-card-label">Due Date</span>
-                    <span className="data-card-value">
-                      {member.dueDate ? new Date(member.dueDate).toLocaleDateString() : "N/A"}
-                    </span>
+                    <span className="data-card-label">Assigned Plan</span>
+                    <span className="data-card-value">{member.plan}</span>
                   </div>
                 </div>
               </div>

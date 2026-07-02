@@ -1,7 +1,8 @@
 import "./pages.css";
-import { currentRole } from "../utils/role";
+import { getCurrentRole } from "../utils/role";
 
 function MemberDashboard() {
+  const currentRole = getCurrentRole();
   if (currentRole !== "member") {
     return (
       <div className="page-wrapper">

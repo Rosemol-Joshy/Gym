@@ -1,8 +1,19 @@
 import { useEffect, useState } from "react";
 import { getMemberships, addMembership, updateMembership, deleteMembership } from "../services/membershipService";
+import { getCurrentRole } from "../utils/role";
 import "./pages.css";
 
 function Membership() {
+  const currentRole = getCurrentRole();
+  if (currentRole !== "admin") {
+    return (
+      <div className="page-wrapper">
+        <div className="page-container">
+          <h1>Access Denied</h1>
+        </div>
+      </div>
+    );
+  }
   const [plans, setPlans] = useState([]);
   const [editingId, setEditingId] = useState(null);
 

@@ -1,8 +1,19 @@
 import { useEffect, useState } from "react";
 import { getTrainers, addTrainer, updateTrainer, deleteTrainer } from "../services/trainerService";
+import { getCurrentRole } from "../utils/role";
 import "./pages.css";
 
 function Trainer() {
+  const currentRole = getCurrentRole();
+  if (currentRole !== "admin") {
+    return (
+      <div className="page-wrapper">
+        <div className="page-container">
+          <h1>Access Denied</h1>
+        </div>
+      </div>
+    );
+  }
   const [trainers, setTrainers] = useState([]);
   const [editingId, setEditingId] = useState(null);
 
