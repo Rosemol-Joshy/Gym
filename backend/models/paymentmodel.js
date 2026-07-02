@@ -1,60 +1,25 @@
-const db = require("../config/db");
+const Payment = require("./paymentschema");
 
-const createPayment = (paymentData, callback) => {
-  const sql = `
-    INSERT INTO payments
-    (member_name, amount, payment_date, due_date, status)
-    VALUES (?, ?, ?, ?, ?)
-  `;
-
-  db.query(
-    sql,
-    [
-      paymentData.member_name,
-      paymentData.amount,
-      paymentData.payment_date,
-      paymentData.due_date,
-      paymentData.status,
-    ],
-    callback
-  );
+const createPayment = async (paymentData) => {
+  return await Payment.create(paymentData);
 };
 
-const getAllPayments = (callback) => {
-  const sql = "SELECT * FROM payments";
-  db.query(sql, callback);
+const getAllPayments = async () => {
+  return await Payment.find().sort({ createdAt: -1 });
 };
 
-const getPaymentById = (id, callback) => {
-  const sql = "SELECT * FROM payments WHERE payment_id = ?";
-  db.query(sql, [id], callback);
+const getPaymentById = async (id) => {
+  return await Payment.findById(id);
 };
 
-const updatePayment = (id, paymentData, callback) => {
-  const sql = `
-    UPDATE payments
-    SET member_name = ?, amount = ?, payment_date = ?,
-        due_date = ?, status = ?
-    WHERE payment_id = ?
-  `;
-
-  db.query(
-    sql,
-    [
-      paymentData.member_name,
-      paymentData.amount,
-      paymentData.payment_date,
-      paymentData.due_date,
-      paymentData.status,
-      id,
-    ],
-    callback
-  );
+const updatePayment = async (id, paymentData) => {
+  return await Payment.findByIdAndUpdate(id, paymentData, {
+    new: true,
+  });
 };
 
-const deletePayment = (id, callback) => {
-  const sql = "DELETE FROM payments WHERE payment_id = ?";
-  db.query(sql, [id], callback);
+const deletePayment = async (id) => {
+  return await Payment.findByIdAndDelete(id);
 };
 
 module.exports = {
